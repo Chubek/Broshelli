@@ -77,7 +77,7 @@ static void read_wide_json(FILE *file, wchar_t *fmt, ...) {
 					chr = fgetc(file);
 					if (VAL_TERM(chr))
 						break;
-					*(bytes++) = chr;
+					*(byte) = chr;
 				} while (1);
 				break;
 			case L's':
