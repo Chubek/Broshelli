@@ -119,15 +119,15 @@ static void parse_formatted_json(FILE *file, wchar_t *fmt, ...) {
 				} while (1);
 				break;
 			case L'a':
-				char achr[1], aprevchr, **astrarg = va_arg(argls, char**), *astr = *astrarg;
+				char achr, aprevchr, **astrarg = va_arg(argls, char**), *astr = *astrarg;
 				fgetwc(file);
 				do {
 					chr = fgetwc(file);
-					wctomb(&achr[0], chr);
-					if (STR_TERM_ASCII(achr[0], aprevchr))
+					achr = wctob(chr);
+					if (STR_TERM_ASCII(chr, aprevchr))
 						break;
-					NEXT_DEREF(astr) = achr[0];
-					aprevchr = achr[0];
+					NEXT_DEREF(astr) = achr;
+					aprevchr = achr;
 				} while (1);
 				break;
 			default:
@@ -164,16 +164,17 @@ static void marshal_formatted_json(FILE *file, wchar_t *fmt, ...) {
 				break;
 			case L's':
 				wchar_t **wstrarg = va_arg(argls, wchar_t**), *wstr = *wstrarg;
-				fwprintf(file, L"\"%ls\"", wstr);
+				fputwc(L'"', file);
+				fputws(wstr, file);
+				fputwc(L'"', file);
 				break;
 			case L'a':
-				char **astrarg = va_arg(argls, char**), *astr = *astrarg;
-				wchar_t *wstrconv;
-				size_t alen = mbstowcs(NULL, astr, 0);
-				wstrconv = calloc(alen, sizeof(*wstrconv));
-				mbstowcs(wstrconv, astr, alen);
-				fwprintf(file, L"\"%ls\"", wstrconv);
-				free(wstrconv);
+				char achr, **astrarg = va_arg(argls, char**), *astr = *astrarg;
+				fputwc(L'"', file);
+				while (achr = *astr++) {
+					fputwc(btowc(achr), file);	
+				} 
+				fputwc(L'"', file);
 				break;
 			default:
 				break;
@@ -191,8 +192,8 @@ int main() {
 	char str[40] = {0};
 	char *tst = &str[0];
 	//allcoate_new_message_context(&context);
-	parse_formatted_json(stdin, L"{'z':%i}", &tst);
-	marshal_formatted_json(stdout, L"{'z':%i}", &tst);
+	parse_formatted_json(stdin, L"%a", &tst);
+	marshal_formatted_json(stdout, L"{'z':%a}", &tst);
 	//deallocate_message_context(&context);
 
 }
