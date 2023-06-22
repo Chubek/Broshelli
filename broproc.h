@@ -11,6 +11,12 @@
 #include <stdio.h>
 #endif
 
+#ifndef SIGNAL_H
+#define SIGNAL_H
+#include <signal.h>
+#endif
+
+
 #ifndef TYPES_H
 #define TYPES_H
 #include <sys/types.h>
@@ -41,17 +47,22 @@ typedef struct {
 	FILE *slaves;
 } bproc_t;
 
-static inline int fork_off(bproc_t *proc) {
-	if (!!(proc->pid = fork()))
-		return ERR;
-}
-
-static inline int handle_fork(bproc_t *proc) {
+static inline int fork_off_and_exec_shell(bproc_t *proc) {
+	if ((proc->pid = fork()) < 0)
+		return proc->pid;
 	if (!proc->pid) {
-		proc->slavefd = open(&proc->slavename[0], O_RDWRY);
+		static inline void kill_exec_handler(int sig) {
+			close(proc->slavefd);
+			_exit();
+		}
+		signal(SIGINT, kill_exec_handler);
+		proc->slavefd = open(&proc->slavename[0], O_RDWR);
 		execv(proc->shell, proc->args);
 	}
 }
 
+static inline int kill_exec_process(bproc_t *proc) {
+	return kill(proc->pid, SIGINT);
+}
 
 #endif
