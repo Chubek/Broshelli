@@ -27,6 +27,8 @@
 #define SPTYNAME_MAX 64
 #endif
 
+#define ERR -1
+
 typedef struct {
 	int master;
 	int slave;
@@ -35,8 +37,6 @@ typedef struct {
 	FILE *sstream;
 } bpty_t;
 
-
-#define ERR -1
 
 static inline int open_pty_device_pair(bpty_t *pty) {
 	if (!(pty->master = posix_openpt(ORDWR | ONOCTTY)))
@@ -56,18 +56,18 @@ static inline int open_pty_device_pair(bpty_t *pty) {
 	pty->sstream = fdopen(pty->slave);
 }
 
-static inline close_pty_device_pair(bpty_t *pty) {
+static inline void close_pty_device_pair(bpty_t *pty) {
 	close(pty->master);
 	close(pty->slave);
 }
 
-static inline write_to_master(bpty_t *pty, char *data, char term, size_t maxlen) {
+static inline char write_to_master(bpty_t *pty, char *data, char term, size_t maxlen) {
 	char chr;
 	while (((chr = fputc(*dst++, pty->mstream)) != term) && --maxlen);
 	return chr;
 }
 
-static inline read_from_slave(bpty_t *pty, char *data, char term, size_t maxlen) {
+static inline char read_from_slave(bpty_t *pty, char *data, char term, size_t maxlen) {
 	char chr;
 	while ((chr = (*(data++) = fgetc(pty->sstream)) != term) && --maxlen);
 	return chr;
