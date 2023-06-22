@@ -8,9 +8,9 @@
 #endif
 
 
-#ifndef PTY_H
-#define PTY_H
-#include <pty.h>
+#ifndef FCNTL_H
+#define FCNTL_H
+#include <fcntl.h>
 #endif
 
 #ifndef UNISTD_H
@@ -23,17 +23,30 @@
 #include <stdint.h>
 #endif
 
+#ifndef SPTYNAME_MAX
+#define SPTYNAME_MAX 64
+#endif
+
 typedef struct {
 	int master;
 	int slave;
+	char slavename[SPTYNAME_MAX];
 	FILE *mstream;
 	FILE *sstream;
 } bpty_t;
 
 static inline open_pty_device_pair(bpty_t *pty) {
-	openpty(&pty->master, &pty->slave, NULL, NULL);
-	pty->mstream = fdopen(pty->master, "w");
-	pty->sstream = fdopen(pty->slave, "w");
+	pty->master = posix_openpt(ORDWR | ONOCTTY);
+	#ifndef __NO_GRANT__
+	grantpt(pty->master);
+	#endif
+	unlockpt(pty->master);
+	char *sname = &pty->slavename[0];
+	sname = ptsname(pty->master);
+	pty->slave = open(sname, O_RDONLY);
+	pty->mstream = fdopen(pty->master);
+	pty->sstream = fdopen(pty->slave);
+
 }
 
 static inline close_pty_device_pair(bpty_t *pty) {
