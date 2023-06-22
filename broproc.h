@@ -47,22 +47,9 @@ typedef struct {
 	FILE *slaves;
 } bproc_t;
 
-static inline int fork_off_and_exec_shell(bproc_t *proc) {
-	if ((proc->pid = fork()) < 0)
-		return proc->pid;
-	if (!proc->pid) {
-		static inline void kill_exec_handler(int sig) {
-			close(proc->slavefd);
-			_exit();
-		}
-		signal(SIGINT, kill_exec_handler);
-		proc->slavefd = open(&proc->slavename[0], O_RDWR);
-		execv(proc->shell, proc->args);
-	}
-}
 
-static inline int kill_exec_process(bproc_t *proc) {
-	return kill(proc->pid, SIGINT);
-}
+void termination_handler(int signum);
+int fork_off_and_exec_shell(bproc_t *proc);
+int kill_exec_process(bproc_t *proc);
 
 #endif
