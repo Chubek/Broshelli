@@ -16,22 +16,24 @@ int open_pty_device_pair(bpty_t *pty) {
 		return ret;
 	if ((ret = pty->slavefd = open(sname, O_RDONLY)) < 0)
 		return ret;
-	pty->masters = fdopen(pty->masterfd);
-	pty->slaves = fdopen(pty->slavefd);
+	pty->masters = fdopen(pty->masterfd, "w");
+	pty->slaves = fdopen(pty->slavefd, "w");
 }
 
 void close_pty_device_pair(bpty_t *pty) {
 	close(pty->masterfd);
 	close(pty->slavefd);
+	fclose(pty->masters);
+	fclose(pty->slaves);
 }
 
-char write_to_masterfd(bpty_t *pty, char *data, char term, size_t maxlen) {
+char write_to_master(bpty_t *pty, char *data, char term, size_t maxlen) {
 	char chr;
 	while (((chr = fputc(*dst++, pty->masters)) != term) && --maxlen);
 	return chr
 }
 
-char read_from_slavefd(bpty_t *pty, char *data, char term, size_t maxlen) {
+char read_from_slave(bpty_t *pty, char *data, char term, size_t maxlen) {
 	char chr;
 	while ((chr = (*(data++) = fgetc(pty->slaves)) != term) && --maxlen);
 	return chr;

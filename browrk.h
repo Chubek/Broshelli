@@ -34,9 +34,14 @@
 #define SPTYNAME_LEN 64
 #endif
 
-#ifndef ERR
-#define ERR -1
+#ifndef TMP_PROC_DIR_FMT
+#define TMP_PROC_DIR_FMT "/tmp/bty/%lu.btyproc"
 #endif
+
+#ifndef TMP_PROC_DIR_LEN
+#define TMP_PROC_DIR_LEN 48
+#endif
+
 
 typedef struct {
 	pid_t pid;
@@ -46,6 +51,12 @@ typedef struct {
 	int slavefd;
 	FILE *slaves;
 } bproc_t;
+
+typedef enum {
+	ACT_STORE = 0,
+	ACT_RETRIEVE = 1,
+	ACT_UNLINK = 3,
+} bsttact_t;
 
 
 void termination_handler(int signum);
