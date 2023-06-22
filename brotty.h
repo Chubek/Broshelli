@@ -35,18 +35,25 @@ typedef struct {
 	FILE *sstream;
 } bpty_t;
 
-static inline open_pty_device_pair(bpty_t *pty) {
-	pty->master = posix_openpt(ORDWR | ONOCTTY);
-	#ifndef __NO_GRANT__
-	grantpt(pty->master);
+
+#define ERR -1
+
+static inline int open_pty_device_pair(bpty_t *pty) {
+	if (!(pty->master = posix_openpt(ORDWR | ONOCTTY)))
+		return ERR;
+	#ifndef NO_GRANT
+	if (!grantpt(pty->master))
+		return ERR;
 	#endif
-	unlockpt(pty->master);
+	if (!unlockpt(pty->master))
+		return ERR;
 	char *sname = &pty->slavename[0];
-	sname = ptsname(pty->master);
-	pty->slave = open(sname, O_RDONLY);
+	if (!(sname = ptsname(pty->master))) 
+		return ERR;
+	if (!(pty->slave = open(sname, O_RDONLY)))
+		return ERR;
 	pty->mstream = fdopen(pty->master);
 	pty->sstream = fdopen(pty->slave);
-
 }
 
 static inline close_pty_device_pair(bpty_t *pty) {
