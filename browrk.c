@@ -1,4 +1,4 @@
-#include "broproc.h"
+#include "browrk.h"
 
 int bproc_state_io(bproc_t *proc, bsttact_t action) {
 	pid_t spid = getpid();
