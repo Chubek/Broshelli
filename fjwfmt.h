@@ -1,5 +1,5 @@
-#ifndef FJIOWF_H
-#define FJIOWF_H
+#ifndef FJWFMT_H
+#define FJWFMT_H
 
 #ifndef FDIGIT_MAX
 #define FDIGIT_MAX 256
