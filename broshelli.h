@@ -1,46 +1,19 @@
 #ifndef BROSHELLI_H
 #define BROSHELLI_H
 
-#ifndef STDLIB_H
-#define STDLIB_H
+#define _XOPEN_SOURCE 600
+#define _GNU_SOURCE
 #include <stdlib.h>
-#endif
-
-#ifndef STDINT_H
-#define STDINT_H
+#include <fcntl.h>
 #include <stdint.h>
-#endif
-
-#ifndef SIGNAL_H
-#define SIGNAL_H
 #include <signal.h>
-#endif
-
-#ifndef WCHAR_H
-#define WCHAR_H
 #include <wchar.h>
-#endif
-
-
-#ifndef STDIO_H
-#define STDIO_H
 #include <stdio.h>
-#endif
-
-#ifndef TERMIOS_H
-#define TERMIOS_H
+#include <string.h>
 #include <termios.h>
-#endif
-
-#ifndef UNISTD_H
-#define UNISTD_H
 #include <unistd.h>
-#endif
-
-#ifndef TYPES_H
-#define TYPES_H
 #include <sys/types.h>
-#endif
+
 
 #if !defined(STDIN_FD) && !defined(STDOUT_FD) && !defined(STDERR_FD)
 #define STDIN_FD 0
@@ -76,15 +49,6 @@
 #define SHELL_DFL "/usr/bin/bash"
 #endif
 
-#ifdef EXECV_PATH
-#define EXECV_FN execvp
-#else
-#define EXECV_FN execv
-#endif
-
-#ifndef EXEC_ARGS
-#define EXEC_ARGS NULL
-#endif
 
 typedef enum {
 	STORE_CTX,
@@ -99,14 +63,14 @@ typedef struct {
 	int slavefd;
 	char slavefname[SLVFN_LEN];
 	pid_t slavepid;
-	FILE *tmpf;
+	FILE *smaster;
 	union {
 		uintptr_t arena[ARENA_SIZE];
 		struct {
 			uint16_t ptyid;
 			uint32_t size;
 			char *command;
-		} browsermsg;
+		} msg;
 	} browserio;
 } btyctx_t;
 
