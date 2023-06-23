@@ -13,10 +13,6 @@
 #define BYTES_MAX 10
 #endif
 
-#ifndef PTMPDIR_MAX
-#define PTMPDIR_MAX 16
-#endif
-
 #ifndef STDIO_H
 #define STDIO_H
 #include <stdio.h>
@@ -235,7 +231,7 @@ static void fjprintwf(FILE *file, wchar_t *fmt, ...) {
         break;
       }
     } else {
-      fputwc(fchr, file);
+      fputwc((fchr == L'\'') ? L'"' : fchr, file);
     }
   }
   va_end(argls);
@@ -288,36 +284,7 @@ static void fjprintws(wchar_t *str, wchar_t *fmt, ...) {
   va_end(argls);
 }
 
-#define jscanwf(FMT, ...) fjscanwf(stdin, __VA_ARGS__)
-#define jprintwf(FM, ...) fjprintwf(stdout, __VA_ARGS__)
-
-static nametmpf(char *dst, char *fmt, ...) {
-  char chr, tmpdir[PTMPDIR_MAX] = P_tmpdir, *tmpdirs = &tmpdir[0];
-  while ((chr = NEXT(tmpdirs)))
-    NEXT_DEREF(dst) = chr;
-  NEXT_DEREF(dst) = '/';
-  va_list argls;
-  va_start(argls, fmt);
-  while((chr = NEXT(fmt))) {
-    if (ATAG(chr)) {
-      chr = NEXT(fmt);
-      switch (chr) {
-        case 'i':
-          uint64_t intarg = va_arg(argls, uint64_t);
-          sprintf(dst, "%lu", intarg);
-          dst += sizeof(uint64_t);
-          break;
-        case 's':
-          char ichr, *strarg = va_arg(argls, char *);
-          while ((ichr = NEXT(strarg)))
-            NEXT_DEREF(dst) = ichr;
-          break;
-      }
-    } else {
-      NEXT_DEREF(dst) = chr;
-    }
-  }
-  va_end(argls);
-}
+#define jscanwf(FMT, ...) fjscanwf(stdin, FMT, __VA_ARGS__)
+#define jprintwf(FM, ...) fjprintwf(stdout, FMT, __VA_ARGS__)
 
 #endif

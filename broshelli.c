@@ -1,6 +1,32 @@
-#include "fjwfmt.h"
 #include "broshelli.h"
 
+int context_io_handle(btyctx_t *ctx, btydir_t dir) {
+	FILE *tmpf;
+	pid_t pid = getpid();
+	char chr, fpath[TMPSTATEFPATH_LEN] = P_tmpdir, *fpaths = *fpathscp = &fpath[0];
+	while ((chr = *fpaths++));
+	*fpaths++ = '/';
+	sprintf(fpaths, "%lu.tmp", pid);
+	if (dir == STORE_CTX) {
+		tmpf = fopen(fpathscp, "w");
+		return fwrite(ctx, sizeof(*ctx), 1, tmpf);
+	} else if (dir == RETRIEVE_CTX) {
+		tmpf = fopen(fpathscp, "r");
+		return fread(ctx, sizeof(*ctx), 1, tmpf);
+	} else if (dir == REMOVE_CTX) {
+		return unlink(fpathscp);
+	}
+}
+
+void interrupt_signal_handler(int signum) {
+	if (signum == SIGINT) {
+		btyctx_t *ctx;
+		context_io_handle(ctx, RETRIEVE_CTX);
+		close(ctx->masterfd);
+		close(ctx->slavefd);
+		_exit(EXIT_SUCCES);
+	}
+}
 
 int open_pty_pair(btyctx_t *ctx) {
 	int ret;
@@ -20,6 +46,7 @@ int fork_off_slave_and_exec(btyctx_t *ctx) {
 	if ((ret = ctx->slavepid = fork()) < 0)
 		return ret;
 	if (!ctx->slavepid) {
+		signal(SIGINT, interrupt_signal_handler);
 		char *shell;
 		int slvfdcp1, slvfdcp2, slvfdcp3, ret;
 		slvfdcp1 = dup(ctx->slavefd);
@@ -35,6 +62,27 @@ int fork_off_slave_and_exec(btyctx_t *ctx) {
 			shell = SHELL_DFL;
 		if ((ret = EXECV_FN(shell, EXEC_ARGS)) < 0)
 			_exit(EXIT_ERR);
+		context_io_handle(ctx, STORE_CTX);
 	}
 }
 
+inline int write_stream_to_master(btyctx_t *ctx, char *stream, char term) {
+	char chr;
+	while ((chr = fputc(*stream++, ctx->masterfd)) != term);
+}
+
+inline int read_stream_from_master(btyctx_t *ctx, char *stream, char term) {
+	char chr;
+	while ((chr = *stream++ = fgetc(ctx->masterfd)) != term);
+}
+
+inline void parse_browser_message(btyctx_t *ctx) {
+	memset(ctx->browserio.arena, 0, sizeof(ctx->browserio.arena));
+	fread(&ctx->browserio.browsermsg.size, sizeof(uint32_t), 1, stdin);
+	scanf("{\"ptyid\":%u,\"cmd\":\"%s\"}", &ctx->browserio.browsermsg.ptyid, &ctx->browserio.browsermsg.command);
+}
+
+inline void marshal_browser_message(btyctx_t *ctx) {
+	fwrite(&ctx->browserio.browsermsg.size, sizeof(uint32_t), 1, stdout);
+	printf("{\"ptyid\":%u,\"cmd\":\"%s\"}", ctx->browserio.browsermsg.ptyid, ctx->browserio.browsermsg.command);	
+}

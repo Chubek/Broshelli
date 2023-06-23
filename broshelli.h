@@ -11,6 +11,17 @@
 #include <stdint.h>
 #endif
 
+#ifndef SIGNAL_H
+#define SIGNAL_H
+#include <signal.h>
+#endif
+
+#ifndef WCHAR_H
+#define WCHAR_H
+#include <wchar.h>
+#endif
+
+
 #ifndef STDIO_H
 #define STDIO_H
 #include <stdio.h>
@@ -37,8 +48,16 @@
 #define STDERR_FD 2
 #endif
 
+#ifndef TMPSTATEFPATH_LEN
+#define TMPSTATEFPATH_LEN 64
+#endif
+
 #ifndef EXIT_ERR
 #define EXIT_ERR 1
+#endif
+
+#ifndef EXIT_SUCCESS
+#define EXIT_SUCCESS 0
 #endif
 
 #ifndef SLVFN_LEN
@@ -67,12 +86,28 @@
 #define EXEC_ARGS NULL
 #endif
 
+typedef enum {
+	STORE_CTX,
+	RETRIEVE_CTX,
+	REMOVE_CTX,
+	READ_BROWSERIO,
+	WRITE_BROWSERIO,
+} btydir_t;
+
 typedef struct {
 	int masterfd;
 	int slavefd;
 	char slavefname[SLVFN_LEN];
 	pid_t slavepid;
-	uintptr_t arena[ARENA_SIZE];
+	FILE *tmpf;
+	union {
+		uintptr_t arena[ARENA_SIZE];
+		struct {
+			uint16_t ptyid;
+			uint32_t size;
+			char *command;
+		} browsermsg;
+	} browserio;
 } btyctx_t;
 
 
