@@ -1,4 +1,5 @@
 #include "broshelli.h"
+#include "fjwfmt.h"
 
 int context_io_handle(btyctx_t *ctx, btydir_t dir) {
 	FILE *tmpf;
@@ -82,12 +83,12 @@ int read_stream_from_master(btyctx_t *ctx, char *stream, char term) {
 void parse_browser_message(btyctx_t *ctx) {
 	memset(ctx->browserio.arena, 0, sizeof(ctx->browserio.arena));
 	fread(&ctx->browserio.msg.size, sizeof(uint32_t), 1, stdin);
-	scanf("{\"ptyid\":%hu,\"cmd\":\"%s\"}", &ctx->browserio.msg.ptyid, ctx->browserio.msg.command);
+	jscanf("{'ptyid':%i,'cmd':%s}", &ctx->browserio.msg.ptyid, &ctx->browserio.msg.command[0]);
 }
 
 void marshal_browser_message(btyctx_t *ctx) {
 	fwrite(&ctx->browserio.msg.size, sizeof(uint32_t), 1, stdout);
-	printf("{\"ptyid\":%hu,\"cmd\":\"%s\"}", ctx->browserio.msg.ptyid, ctx->browserio.msg.command);	
+	jprintf("{'ptyid':%i,'cmd':%s}", ctx->browserio.msg.ptyid, &ctx->browserio.msg.command[0]);	
 }
 
 int main() {

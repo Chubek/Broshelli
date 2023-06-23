@@ -25,6 +25,10 @@
 #define TMPSTATEFPATH_LEN 64
 #endif
 
+#ifndef MAX_CMD_LEN
+#define MAX_CMD_LEN 4096
+#endif
+
 #ifndef EXIT_ERR
 #define EXIT_ERR 1
 #endif
@@ -69,7 +73,7 @@ typedef struct {
 		struct {
 			uint16_t ptyid;
 			uint32_t size;
-			char *command;
+			char command[MAX_CMD_LEN];
 		} msg;
 	} browserio;
 } btyctx_t;

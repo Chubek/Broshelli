@@ -50,6 +50,62 @@
 #define NEXT(STREAM) *STREAM++
 #define NEXT_DEREF(STREAM) *(STREAM++)
 
+static void fjscanf(FILE *file, char *fmt, ...) {
+  char chr, fchr, prevchr;
+  va_list argls;
+  va_start(argls, fmt);
+  while ((fchr = NEXT(fmt))) {
+    if (TAG(fchr)) {
+      fchr = NEXT(fmt);
+      switch (fchr) {
+      case 'i':
+        uint64_t *intptr = va_arg(argls, uint64_t *);
+        char idigits[IDIGIT_MAX] = {0}, *idptr = &idigits[0];
+        do {
+          chr = fgetc(file);
+          if (VAL_TERM(chr))
+            break;
+          NEXT_DEREF(idptr) = chr;
+        } while (1);
+        *intptr = strtoul(idigits, NULL, 10);
+        break;
+      case 'f':
+        double *fltptr = va_arg(argls, double *);
+        char fdigits[FDIGIT_MAX] = {0}, *fdptr = &fdigits[0];
+        do {
+          chr = fgetc(file);
+          if (VAL_TERM(chr))
+            break;
+          NEXT_DEREF(fdptr) = chr;
+        } while (1);
+        *fltptr = strtod(fdigits, NULL);
+        break;
+      case 'b':
+        fchr = NEXT(fmt);
+        int numbytes = (int)(fchr - L'0'), nextbyte = 0;
+        char *bytesptr = va_arg(argls, char *);
+        fread(bytesptr, 1, numbytes, file);
+        break;
+      case 's':
+        char *str = va_arg(argls, char *);
+        do {
+          chr = fgetc(file);
+          if (STR_TERM(chr, prevchr))
+            break;
+          NEXT_DEREF(str) = chr;
+          prevchr = chr;
+        } while (1);
+        break;
+      default:
+        break;
+      }
+    } else {
+      fgetc(file);
+    }
+  }
+  va_end(argls);
+}
+
 static void fjscanwf(FILE *file, wchar_t *fmt, ...) {
   wchar_t chr, fchr, wprevchr;
   va_list argls;
@@ -88,7 +144,7 @@ static void fjscanwf(FILE *file, wchar_t *fmt, ...) {
         break;
       case L's':
         wchar_t **wstrarg = va_arg(argls, wchar_t **),
-                           = *wstrarg;
+                           *wstr = *wstrarg;
         fgetwc(file);
         do {
           chr = fgetwc(file);
@@ -191,6 +247,43 @@ static void fjscanws(wchar_t *str, wchar_t *fmt, ...) {
   va_end(argls);
 }
 
+static void fjprintf(FILE *file, char *fmt, ...) {
+  char chr, fchr;
+  va_list argls;
+  va_start(argls, fmt);
+  while ((fchr = NEXT(fmt))) {
+    if (TAG(fchr)) {
+      fchr = NEXT(fmt);
+      switch (fchr) {
+      case 'i':
+        uint64_t intptr = va_arg(argls, uint64_t);
+        fprintf(file, "%lu", intptr);
+        break;
+      case 'f':
+        double fltptr = va_arg(argls, double);
+        fprintf(file, "%f", fltptr);
+        break;
+      case 'b':
+        chr = NEXT(fmt);
+        int numbytes = (int)(fchr - '0'), nextbyte = 0;
+        char *bytesptr = va_arg(argls, char *);
+        fwrite(bytesptr, 1, numbytes, file);
+        break;
+      case 's':
+        char *str = va_arg(argls, char *);
+        fputc('"', file);
+        fputs(str, file);
+        fputc('"', file);
+        break;
+      default:
+        break;
+      }
+    } else {
+      fputc((fchr == '\'') ? '"' : fchr, file);
+    }
+  }
+  va_end(argls);
+}
 
 static void fjprintwf(FILE *file, wchar_t *fmt, ...) {
   wchar_t chr, fchr;
@@ -285,6 +378,9 @@ static void fjprintws(wchar_t *str, wchar_t *fmt, ...) {
 }
 
 #define jscanwf(FMT, ...) fjscanwf(stdin, FMT, __VA_ARGS__)
-#define jprintwf(FM, ...) fjprintwf(stdout, FMT, __VA_ARGS__)
+#define jprintwf(FMT, ...) fjprintwf(stdout, FMT, __VA_ARGS__)
+#define jscanf(FMT, ...) fjscanf(stdin, FMT, __VA_ARGS__)
+#define jprintf(FMT, ...) fjprintf(stdout, FMT, __VA_ARGS__)
+
 
 #endif
