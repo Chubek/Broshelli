@@ -17,12 +17,8 @@
 #include <sys/ptrace.h>
  #include <sys/stat.h>
 
-#define STDIN_FD fileno(stdin)
-#define STDOUT_FD fileno(stdout)
-#define STDERR_FD fileno(stderr)
-
-#ifndef SLVFNAME_LEN
-#define SLVFNAME_LEN 64
+#ifndef SLVFNAME_LEN_MAX
+#define SLVFNAME_LEN_MAX 64
 #endif
 
 #ifndef SHELL_PATH_LEN
@@ -49,9 +45,6 @@
 #define SHELL_DFL "/usr/bin/bash"
 #endif
 
-#define FLAG_NEW_MSG 255
-#define FLAG_SEND_MSG 128
-
 #if  !defined(MSG_DELIVER_ERR_MSG_TXT) && !defined(MSG_DELIVER_ERR_MSG_LEN)
 #define MSG_DELIVER_ERR_MSG_TXT "Failed to relay command to shell process"
 #define MSG_DELIVER_ERR_MSG_LEN 45
@@ -61,24 +54,32 @@
 #define SWAP_AREA_LEN 64000
 #endif
 
-#define CONCAT_RET_FDESCS(MASTERFD, PROCNUM) ((PROCNUM << 31) | MASTERFD)
-
-#define FOREVER 1
-#define TERM_SHELL_OUT_FLAG 2429131399224ULL
 
 #ifndef __SIZEOF_LONG_LONG__
 #define __SIZEOF_LONG_LONG__ sizeof(unsigned long long)
 #endif
 
-#define MESSAGE_RECEIVE_SUCCESS 1D
-#define TERM_CREATE_SUCCESS 1D
 
-#define SANITIZE_SIG_RETURN(SIGVAL) ((SIGVAL.si_signo  << 64) | (-1 * SIGVAL.si_value.si_int) )
-#define RETURN_PROCID_SUCCESS(PROCID) (133421d | (PROCID << 32))
+#define STDIN_FD fileno(stdin)
+#define STDOUT_FD fileno(stdout)
+#define STDERR_FD fileno(stderr)
+
+#define RETCTX_NUM 5
+
+#define FLAG_NEW_CMD 255
+#define FLAG_SEND_OUT 128
+#define FLAG_TERM_PTY 221
+#define FLAG_TERM_MASTER 255
+
+#define MESSAGE_RECEIVE_SUCCESS 1
+#define TERM_CREATE_SUCCESS 1
+#define MQUEUE_FNAME_SUCCESS 1
+#define SHELL_DEFAULTED 123
 
 #define MQNAME_FAIL_RET -1
 #define PTERM_LOOP_FAIL -1
 #define TERM_FINISHED 1
+#define RETCTX_SUCCESS 1
 
 #define SIGNUM_SHELL_EXEC SIGRTMIN
 #define SIGNUM_PIPE_OPEN SIGRTMIN + 1
@@ -90,6 +91,12 @@
 #define SIGNUM_MQUEUE_NAME SIGRTMIN + 7
 #define SIGNUM_TERMINATE_MASTER SIGRTMIN + 8
 #define SIGNUM_MQUEUE_RECEIVE SIGRTMIN + 9
+
+#define SANITIZE_SIG_RETURN(SIGVAL) ((SIGVAL.si_signo  << 64) | (-1 * SIGVAL.si_value.si_int) )
+#define RETURN_PROCID_SUCCESS(PROCID) (133421d | (PROCID << 32))
+
+#define IS_FLAG(BUFF, FLAG) (unsigned char)BUFF[0] == FLAG
+#define IS_NOT_FLAG(BUFF, FLAG) (unsigned char)BUFF[0] != FLAG
 
 #define WAIT_FOR_SIGNALS(INFO, NSECS, ...)                                             \
   do {                                                                         \
@@ -106,7 +113,7 @@
   sigqueue(PROCNUM, SIGNUM, (union sigval){.sival_##SVALTYY = SIGVAL})
 #define SEND_SIGNAL_TO_PARENT(...) SEND_SIGNAL(getppid(), __VA_ARGS__)
 #define RAISE_SIGNAL_TO_SELF(...) SEND_SIGNAL(getpid(), __VA_ARGS__)
-#define RELAY_SIGNAL_TO_PARENT(SIGNUM, RELAY_SIGNUM) 							\
+#define RELAY_SIGNUM_TO_PARENT(SIGNUM, RELAY_SIGNUM) 							\
   do {																			\
   	void signal_handler(int signum) {											\
   		SEND_SIGNAL_TO_PARENT(signum, int, RELAY_SIGNUM);						\
@@ -124,19 +131,21 @@
 #define UNTRACE_CHILD_PROCESS(PID) ptrace(PTRAC_DETACH, PID, NULL, NULL)
 
 
+#define ASSIGN_RETCTX(RETCTX, ...) \
+  &RETCTX[0] = {__VA_ARGS__}
+
+typedef struct {
+	char filename[SLVFNAME_LEN_MAX];
+	size_t fnlen;
+} slvfn_t;
+
 typedef struct {
   int masterfd;
   int slavefd;
-  char slavefname[SLVFNAME_LEN];
+  slvfn_t slavefn;
   pid_t slavepid;
   FILE *masterfstm;
 } ptypair_t;
 
-typedef struct {
-  pid_t ptypid;
-  uint32_t msglen;
-  relaydir_t directive;
-  char io[SHELL_IO_LEN];
-} iorelay_t;
 
 #endif
