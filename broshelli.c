@@ -60,8 +60,9 @@ int fork_off_slave_and_exec(char *slavefname) {
 void wait_for_messages_from_main(pid_t cpid, FILE *masterfstm) {
 	int ret;
 	ssize_t iolen;
+	size_t shloutlen;
 	mqd_t mqdesc;
-	char mqname[MQUEUE_NAME_LEN], shellio[SHELL_IO_LEN];
+	char mqname[MQUEUE_NAME_LEN], shellio[SHELL_IO_LEN], termflag[__SIZEOF_LONG_LONG__] = TERM_SHELL_OUT_FLAG;
 	if ((ret = snprintf(&mqname[0], MQUEUE_NAME_LENGHT, "%d.btymq", mypid)) < 0) {
 		SEND_SIGNAL_TO_PARENT(SIGNUM_MQUEUE_NAME, int, ret);
 		_exit(EXIT_FAILURE);
@@ -69,7 +70,18 @@ void wait_for_messages_from_main(pid_t cpid, FILE *masterfstm) {
 	SEND_SIGNAL_TO_PARENT(SIGNUM_MQUEUE_NAME, int, ret);
 	mqdesc = mq_open(mqname, O_RDWR);
 	while (FOREVER) {
-
+		memset(&shellio[0], 0, SHELL_IO_LEN);
+		if ((ret = iolen = mq_receive(mqdesc, &shellio[0], SHELL_IO_LEN, NULL)) < 0) {
+			SEND_SIGNAL_TO_PARENT(SIGNUM_MQUEUE_RECEIVE, int, ret);
+			continue;
+		}
+		SEND_SIGNAL_TO_PARENT(SIGNUM_MQUEUE_RECEIVE, int, ret);
+		fwrite(&shellio[0], sizeof(char), iolen, masterfstm);
+		memset(&shellio[0], 0, iolen);
+		while ((shloutlen = fread(&shellio[0], sizeof(char), SHELL_IO_LEN, masterfstm))) {
+			mq_send(mqdesc, &shellio[0], shloutlen, NULL);
+		}
+		mq_send(mqdesc, TERM_SHELL_OUT_FLAG, __SIZEOF_LONG_LONG__, NULL);
 	}
 }
 
