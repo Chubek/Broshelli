@@ -1,16 +1,4 @@
 #include "broshelli.h"
-#include "fjwfmt.h"
-
-void parse_browser_message(iorelay_t *relay) {
-	memset(relay, 0, sizeof(*relay));
-	fread(&relay->msglen, sizeof(uint32_t), 1, stdin);
-	jscanf("{ptypid':%i,'io':%s}", &relay->ptypid, &relay->io[0]);
-}
-
-void marshal_browser_message(iorelay_t *relay) {
-	fwrite(&relay->relay, sizeof(uint32_t), 1, stdout);
-	jprintf("{'ptypid':%i,'io':%s}", relay->ptypid, &relay->io[0]);	
-}
 
 int open_pty_pair(ptypair_r ppair) {
 	int ret;
@@ -63,6 +51,7 @@ void wait_for_messages_from_main(pid_t cpid, FILE *masterfstm) {
 	size_t shloutlen;
 	mqd_t mqdesc;
 	char mqname[MQUEUE_NAME_LEN], shellio[SHELL_IO_LEN], termflag[__SIZEOF_LONG_LONG__] = TERM_SHELL_OUT_FLAG;
+	memset(&mqname[0], 0, MQUEUE_NAME_LEN);
 	if ((ret = snprintf(&mqname[0], MQUEUE_NAME_LENGHT, "%d.btymq", mypid)) < 0) {
 		SEND_SIGNAL_TO_PARENT(SIGNUM_MQUEUE_NAME, int, ret);
 		_exit(EXIT_FAILURE);
@@ -75,13 +64,13 @@ void wait_for_messages_from_main(pid_t cpid, FILE *masterfstm) {
 			SEND_SIGNAL_TO_PARENT(SIGNUM_MQUEUE_RECEIVE, int, ret);
 			continue;
 		}
-		SEND_SIGNAL_TO_PARENT(SIGNUM_MQUEUE_RECEIVE, int, ret);
+		SEND_SIGNAL_TO_PARENT(SIGNUM_MQUEUE_RECEIVE, int, MESSAGE_RECEIVE_SUCCESS);
 		fwrite(&shellio[0], sizeof(char), iolen, masterfstm);
 		memset(&shellio[0], 0, iolen);
 		while ((shloutlen = fread(&shellio[0], sizeof(char), SHELL_IO_LEN, masterfstm))) {
 			mq_send(mqdesc, &shellio[0], shloutlen, NULL);
 		}
-		mq_send(mqdesc, TERM_SHELL_OUT_FLAG, __SIZEOF_LONG_LONG__, NULL);
+		mq_send(mqdesc, TERM_SHELL_OUT_FLAG, __SIZEOF_LONG_LONG__);
 	}
 }
 
@@ -132,8 +121,56 @@ void handle_new_terminal(int masterfdnotify) {
 }
 
 
-int main() {
-	btyppair_t ppair;
-	parse_browser_message(&ppair);
-	marshal_browser_message(&ppair);
+unsigned long create_new_terminal() {
+	pid_t cpid;
+	int ret, pipefd[2];
+	if ((ret = cpid = form()) < 0)
+		return ret;
+	if (!cpid) {
+		close(pipefd[0]);
+		handle_new_terminal(pipefd[1]);
+	} else {
+		int masterfd;
+		close(pipefd[1]);
+		read(pipefd[0], &masterfd, sizeof(int));
+		struct siginfo signalinfo;
+		WAIT_FOR_SIGNALS(&signalinfo, SIGNUM_FORK_CHILD, MAX_SIGRT_WAITNS, SIGNUM_SLVFD_OPEN, SIGNUM_SLVFD_DUP, SIGNUM_SHELL_EXEC, SIGNUM_EXECVE_SUCCESS);
+		if (signalinfo.si_value.int_val < 0) {
+			return SANITIZE_SIG_RETURN(signalinfo);
+		}
+		return CONCAT_RET_FDESCS(cpid, masterfd);
+	}
+}
+
+int handle_io_from_browser(pid_t procid, int masterfd, char *swap) {
+	int ret;
+	size_t iolen;
+	mqd_t mqdesc;
+	char mqname[MQUEUE_NAME_LEN], *swapptr = &swap[0];
+	struct siginfo signalinfo;
+	memset(&mqname[0], 0, MQUEUE_NAME_LEN);
+	if ((ret = snprintf(&mqname[0], MQUEUE_NAME_LENGHT, "%d.btymq", procid)) < 0) {
+		return MQNAME_FAIL_RET;
+	}
+	while (FOREVER) {
+		if ((unsigned char)*swapptr == FLAG_NEW_MSG) {
+			iolen = 0;
+			memmove(&iolen, &swapptr[1], sizeof(size_t));
+			if ((ret = mq_send(mqdesc, &shellio[1 + sizeof(size_t)], iolen, NULL)) < 0)
+				return ret;
+			memset(&signalinfo, 0, sizeof(struct siginfo));
+			WAIT_FOR_SIGNALS(&signalinfo, SIGNUM_MQUEUE_RECEIVE);
+			if (signalinfo.si_value.sival_int < 0) {
+				return PTERM_LOOP_FAIL;
+			} else if (signalinfo.si_value.sival_int != MESSAGE_RECEIVE_SUCCESS) {
+				memmove(swapptr, MSG_DELIVER_ERR_MSG_TXT, MSG_DELIVER_ERR_MSG_LEN);
+			}
+			*swapptr = (char)FLAG_SEND_MSG;
+			if ((ret = mq_receive(mqdesc, &swapptr[1], SWAP_AREA_LEN, NULL)))
+				return ret;
+		} else if ((unsigned char)*swapptr == FLAG_STOP_CLOSE) {
+			SEND_SIGNAL_TO_CHILD(procid, SIGNUM_TERMINATE_MASTER, int, masterfd);
+			return TERM_FINISHED;
+		}
+	}
 }
