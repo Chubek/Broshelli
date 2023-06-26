@@ -49,6 +49,20 @@
 #define SHELL_DFL "/usr/bin/bash"
 #endif
 
+#define FLAG_NEW_MSG 255
+#define FLAG_SEND_MSG 128
+
+#if  !defined(MSG_DELIVER_ERR_MSG_TXT) && !defined(MSG_DELIVER_ERR_MSG_LEN)
+#define MSG_DELIVER_ERR_MSG_TXT "Failed to relay command to shell process"
+#define MSG_DELIVER_ERR_MSG_LEN 45
+#endif
+
+#ifndef SWAP_AREA_LEN
+#define SWAP_AREA_LEN 64000
+#endif
+
+#define CONCAT_RET_FDESCS(MASTERFD, PROCNUM) ((PROCNUM << 31) | MASTERFD)
+
 #define FOREVER 1
 #define TERM_SHELL_OUT_FLAG 2429131399224ULL
 
@@ -56,7 +70,15 @@
 #define __SIZEOF_LONG_LONG__ sizeof(unsigned long long)
 #endif
 
-#define SIGVAL_SHELL_DFL 7
+#define MESSAGE_RECEIVE_SUCCESS 1D
+#define TERM_CREATE_SUCCESS 1D
+
+#define SANITIZE_SIG_RETURN(SIGVAL) ((SIGVAL.si_signo  << 64) | (-1 * SIGVAL.si_value.si_int) )
+#define RETURN_PROCID_SUCCESS(PROCID) (133421d | (PROCID << 32))
+
+#define MQNAME_FAIL_RET -1
+#define PTERM_LOOP_FAIL -1
+#define TERM_FINISHED 1
 
 #define SIGNUM_SHELL_EXEC SIGRTMIN
 #define SIGNUM_PIPE_OPEN SIGRTMIN + 1
@@ -101,14 +123,6 @@
 #define TRACE_CURR_PROCESS() ptrace(PTRACE_TRACEME, NULL, NULL, NULL)
 #define UNTRACE_CHILD_PROCESS(PID) ptrace(PTRAC_DETACH, PID, NULL, NULL)
 
-
-typedef enum {
-  INIT_TERM,
-  CLOSE_TERM,
-  RELAY_CMD,
-  RELAY_OUTPUT,
-  RELAY_PTYPID,
-} relaydir_t;
 
 typedef struct {
   int masterfd;
