@@ -1,6 +1,6 @@
 #include "broshelli.h"
 
-int open_pty_pair(ptypair_r ppair) {
+int open_pty_pair(ptypair_r *ppair) {
 	int ret;
 	if ((ret = ppair->masterfd = posix_openpt(O_RDWR | O_NOCTTY)) < 0)
 		return ret;
@@ -8,17 +8,17 @@ int open_pty_pair(ptypair_r ppair) {
 		return ret;
 	if ((ret = grantpt(ppair->masterfd)) < 0)
 		return ret;
-	if ((ret = ptsname_r(ppair->masterfd, &ppair->slavefname[0], SLVFN_LEN)) < 0)
+	if ((ret = ppair->slavefn.fnlen = ptsname_r(ppair->masterfd, &ppair->slavefn.filename[0], SLVFNAME_LEN_MAX)) < 0)
 		return ret;
 	if ((ret = ppair->masterfstm = fopen(ppair->masterfd, "w")) < 0)
 		return ret;
 }
 
-int fork_off_slave_and_exec(char *slavefname) {
+int fork_off_slave_and_exec(slvfn_t *slavefn) {
 	RELAY_SIGNUM_TO_PARENT(SIGTRAP, SIGNUM_EXECVE_SUCCESS);
 	char shellpath[SHELL_PATH_LEN], *shell = &shellpath[0];
 	int slvfd, slvfdcp1, slvfdcp2, slvfdcp3, ret;
-	if ((ret = slvfd = open(slavefname, O_RDWR)) < 0) {
+	if ((ret = slvfd = open(&slavefn->filename[0], O_RDWR)) < 0) {
 		SEND_SIGNAL_TO_PARENT(SIGNUM_SLVFD_OPEN, int, ret);
 		_exit(EXIT_FAILURE);
 	}
@@ -36,7 +36,7 @@ int fork_off_slave_and_exec(char *slavefname) {
 		SEND_SIGNAL_TO_PARENT(SIGNUM_SLVFD_DUP, int, ret);
 		_exit(EXIT_FAILURE);
 	if (!(shell = getenv(SHELL_ENV))) {
-		SEND_SIGNAL_TO_PARENT(SIGNUM_SHELL_EXEC, int, SIGNUM_SHELL_DFL);
+		SEND_SIGNAL_TO_PARENT(SIGNUM_SHELL_EXEC, int, SHELL_DEFAULTED);
 		shell = SHELL_DFL;
 	}
 	if ((ret = execlp(shell, shell, (char*)NULL)) < 0) {
@@ -50,15 +50,14 @@ void wait_for_messages_from_main(pid_t cpid, FILE *masterfstm) {
 	ssize_t iolen;
 	size_t shloutlen;
 	mqd_t mqdesc;
-	char mqname[MQUEUE_NAME_LEN], shellio[SHELL_IO_LEN], termflag[__SIZEOF_LONG_LONG__] = TERM_SHELL_OUT_FLAG;
-	memset(&mqname[0], 0, MQUEUE_NAME_LEN);
-	if ((ret = snprintf(&mqname[0], MQUEUE_NAME_LENGHT, "%d.btymq", mypid)) < 0) {
+	char mqname[MQUEUE_NAME_LEN] = { 0 }, shellio[SHELL_IO_LEN] = { 0 };
+	if ((ret = snprintf(&mqname[0], MQUEUE_NAME_LEN, "%d.btymq", mypid)) < 0) {
 		SEND_SIGNAL_TO_PARENT(SIGNUM_MQUEUE_NAME, int, ret);
 		_exit(EXIT_FAILURE);
 	}
-	SEND_SIGNAL_TO_PARENT(SIGNUM_MQUEUE_NAME, int, ret);
+	SEND_SIGNAL_TO_PARENT(SIGNUM_MQUEUE_NAME, int, MQUEUE_FNAME_SUCCESS);
 	mqdesc = mq_open(mqname, O_RDWR);
-	while (FOREVER) {
+	while (IS_NOT_FLAG(shellio, FLAG_TERM_MASTER)) {
 		memset(&shellio[0], 0, SHELL_IO_LEN);
 		if ((ret = iolen = mq_receive(mqdesc, &shellio[0], SHELL_IO_LEN, NULL)) < 0) {
 			SEND_SIGNAL_TO_PARENT(SIGNUM_MQUEUE_RECEIVE, int, ret);
@@ -70,8 +69,9 @@ void wait_for_messages_from_main(pid_t cpid, FILE *masterfstm) {
 		while ((shloutlen = fread(&shellio[0], sizeof(char), SHELL_IO_LEN, masterfstm))) {
 			mq_send(mqdesc, &shellio[0], shloutlen, NULL);
 		}
-		mq_send(mqdesc, TERM_SHELL_OUT_FLAG, __SIZEOF_LONG_LONG__);
+		
 	}
+	_exit(EXIT_SUCCESS);
 }
 
 void sigrt_handle_termination(int signum, siginfo_t *signalinfo, void *unused) {
@@ -121,8 +121,8 @@ void handle_new_terminal(int masterfdnotify) {
 }
 
 
-unsigned long create_new_terminal() {
-	pid_t cpid;
+int create_new_terminal(int retctx[RETCTX_NUM]) {
+	pid_t cpid, shellpid;
 	int ret, pipefd[2];
 	if ((ret = cpid = form()) < 0)
 		return ret;
@@ -137,12 +137,19 @@ unsigned long create_new_terminal() {
 		WAIT_FOR_SIGNALS(&signalinfo, SIGNUM_FORK_CHILD, MAX_SIGRT_WAITNS, SIGNUM_SLVFD_OPEN, SIGNUM_SLVFD_DUP, SIGNUM_SHELL_EXEC, SIGNUM_EXECVE_SUCCESS);
 		if (signalinfo.si_value.int_val < 0) {
 			return SANITIZE_SIG_RETURN(signalinfo);
+		} else if (signalinfo.si_no == SIGNUM_FORK_CHILD) {
+			shellpid = signalinfo.si_value.si_int;
 		}
-		return CONCAT_RET_FDESCS(cpid, masterfd);
+		ASSIGN_RETCTX(retctx, cpid, shellpid, masterfd, signalinfo.si_no, signalinfo.si_value.si_int);
+		return RETCTX_SUCCESS;
 	}
 }
 
-int handle_io_from_browser(pid_t procid, int masterfd, char *swap) {
+int kill_terminal_by_force(pid_t shellpid) {
+	return kill(shellpid, SIGKILL);
+}
+
+int handle_pty_io(pid_t procid, int masterfd, char *swap) {
 	int ret;
 	size_t iolen;
 	mqd_t mqdesc;
@@ -152,8 +159,8 @@ int handle_io_from_browser(pid_t procid, int masterfd, char *swap) {
 	if ((ret = snprintf(&mqname[0], MQUEUE_NAME_LENGHT, "%d.btymq", procid)) < 0) {
 		return MQNAME_FAIL_RET;
 	}
-	while (FOREVER) {
-		if ((unsigned char)*swapptr == FLAG_NEW_MSG) {
+	while (IS_NOT_FLAG(swap, FLAG_TERM_PTY)) {
+		if (IS_FLAG(swap, FLAG_NEW_CMD)) {
 			iolen = 0;
 			memmove(&iolen, &swapptr[1], sizeof(size_t));
 			if ((ret = mq_send(mqdesc, &shellio[1 + sizeof(size_t)], iolen, NULL)) < 0)
@@ -165,12 +172,11 @@ int handle_io_from_browser(pid_t procid, int masterfd, char *swap) {
 			} else if (signalinfo.si_value.sival_int != MESSAGE_RECEIVE_SUCCESS) {
 				memmove(swapptr, MSG_DELIVER_ERR_MSG_TXT, MSG_DELIVER_ERR_MSG_LEN);
 			}
-			*swapptr = (char)FLAG_SEND_MSG;
+			*swapptr = (char)FLAG_SEND_OUT;
 			if ((ret = mq_receive(mqdesc, &swapptr[1], SWAP_AREA_LEN, NULL)))
 				return ret;
-		} else if ((unsigned char)*swapptr == FLAG_STOP_CLOSE) {
-			SEND_SIGNAL_TO_CHILD(procid, SIGNUM_TERMINATE_MASTER, int, masterfd);
-			return TERM_FINISHED;
-		}
+		} 
 	}
+	SEND_SIGNAL_TO_CHILD(procid, SIGNUM_TERMINATE_MASTER, int, masterfd);
+	return TERM_FINISHED;
 }
