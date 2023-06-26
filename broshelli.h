@@ -50,6 +50,11 @@
 #endif
 
 #define FOREVER 1
+#define TERM_SHELL_OUT_FLAG 2429131399224ULL
+
+#ifndef __SIZEOF_LONG_LONG__
+#define __SIZEOF_LONG_LONG__ sizeof(unsigned long long)
+#endif
 
 #define SIGVAL_SHELL_DFL 7
 
@@ -62,6 +67,7 @@
 #define SIGNUM_EXECVE_SUCCESS SIGRTMIN + 6
 #define SIGNUM_MQUEUE_NAME SIGRTMIN + 7
 #define SIGNUM_TERMINATE_MASTER SIGRTMIN + 8
+#define SIGNUM_MQUEUE_RECEIVE SIGRTMIN + 9
 
 #define WAIT_FOR_SIGNALS(INFO, NSECS, ...)                                             \
   do {                                                                         \
