@@ -68,17 +68,12 @@ void wait_for_messages_from_main(pid_t cpid, FILE *masterfstm) {
 		ZERO_OUT(&shellio[0], iolen);
 		while ((shloutlen = fread(&shellio[0], sizeof(char), SHELL_IO_LEN, masterfstm))) {
 			mq_send(mqdesc, &shellio[0], shloutlen, NULL);
+			ZERO_OUT(&shellio[0], SHELL_IO_LEN);
 		}
-		
+		shellio[0] = (char)FLAG_TERM_MSG;
+		mq_send(mqdesc, &shellio[0], sizeof(char), sizeof(char));
 	}
 	_exit(EXIT_SUCCESS);
-}
-
-void sigrt_handle_termination(int signum, siginfo_t *signalinfo, void *unused) {
-	if (signum == SIGNUM_TERMINATE_MASTER) {
-		close(signalinfo->si_value.sival_int);
-		_exit(EXIT_SUCCESS);
-	}
 }
 
 void handle_new_terminal(int masterfdnotify) {
@@ -94,26 +89,22 @@ void handle_new_terminal(int masterfdnotify) {
 		SEND_SIGNAL_TO_PARENT(SIGNUM_PTY_OPEN, int, ret);
 		_exit(EXIT_FAILURE);
 	}
-	write(masterfdnotify, &ppair->masterfd, sizeof(int));
-	close(masterfdnotify);
+	WRITE_AND_CLOSE(masterfdnotify, &ppair->masterfd, sizeof(int));
 	SEND_SIGNAL_TO_PARENT(SIGNUM_PTY_OPEN, int, ret);
 	if ((ret = cpid = fork()) < 0) {
 		SEND_SIGNAL_TO_PARENT(SIGNUM_FORK_CHILD, int, ret);
 		_exit(EXIT_FAILURE);
 	}
 	if (!cpid) {
-		char slavefname[SLVFNAME_LEN];
+		char slavefname[SLVFNAME_LEN_MAX];
 		ZERO_OUT(&slavefname[0], SLVGNAME_LEN);
-		close(pipefd[1]);
-		read(pipefd[0], &slavefname[0], SLVFNAME_LEN);
+		PIPE_READ(pipefd, &slavefname[0], SLVFNAME_LEN_MAX);
 		fork_off_slave_and_exec(&slavefname[0]);
 	} else {
-		SET_RT_SIGNAL_ACTION(SIGNUM_TERMINATE_MASTER, sigrt_handle_termination);
 		siginfo_t signalinfo;
 		ZERO_OUT(&signalinfo, sizeof(siginfo_t));
 		SEND_SIGNAL_TO_PARENT(SIGNUM_FORK_CHILD, int, cpid);
-		close(pipefd[0]);
-		write(pipefd[1], &ppair.slavefname[0], SLVFNAME_LEN);
+		WRITE_AND_CLOSE(pipefd, &ppair.slavefname[0], SLVFNAME_LEN_MAX);
 		WAIT_FOR_SIGNALS(&signalinfo, MAX_SIGRT_WAITNS, SIGNUM_SLVFD_OPEN, SIGNUM_SLVFD_DUP, SIGNUM_SHELL_EXEC, SIGNUM_EXECVE_SUCCESS);
 		UNTRACE_CHILD_PROCESS(cpid);
 		SEND_SIGNAL_TO_PARENT(signalinfo.si_signo, int, signalinfo.si_value.sival_int);
@@ -138,9 +129,8 @@ int create_new_terminal(unsigned long retctx[RETCTX_NUM]) {
 		handle_new_terminal(pipefd[1]);
 	} else {
 		int masterfd;
-		close(pipefd[1]);
-		read(pipefd[0], &masterfd, sizeof(int));
-		struct siginfo signalinfo;
+		PIPE_READ(pipefd, &masterfd, sizeof(int));
+		siginfo_t signalinfo;
 		WAIT_FOR_SIGNALS(&signalinfo, SIGNUM_PIPE_OPEN, SIGNUM_FORK_CHILD, MAX_SIGRT_WAITNS, SIGNUM_SLVFD_OPEN, SIGNUM_SLVFD_DUP, SIGNUM_SHELL_EXEC, SIGNUM_EXECVE_SUCCESS);
 		if (SIG_VAL < 0) {
 			return SANITIZE_SIG_ERR_RETURN(signalinfo);
@@ -159,9 +149,10 @@ int kill_terminal_by_force(pid_t cpid, pid_t shellpid) {
 int handle_pty_io(pid_t procid, int masterfd, char *swap) {
 	int ret;
 	size_t iolen;
+	ssize_t shliolen;
 	mqd_t mqdesc;
 	char mqname[MQUEUE_NAME_LEN] = { 0 }, *swapptr = &swap[0];
-	struct siginfo signalinfo;
+	siginfo_t signalinfo;
 	if ((ret = GET_MQ_NAME(&mqname[0], procid)) < 0) {
 		return MQNAME_FAIL_RET;
 	}
@@ -170,9 +161,9 @@ int handle_pty_io(pid_t procid, int masterfd, char *swap) {
 		if (IS_FLAG(swap, FLAG_NEW_CMD)) {
 			iolen = 0;
 			DATA_COPY(&iolen, &swapptr[1], sizeof(size_t));
-			if ((ret = mq_send(mqdesc, &shellio[1 + sizeof(size_t)], iolen, NULL)) < 0)
+			if ((ret = mq_send(mqdesc, &swap[1 + sizeof(size_t)], iolen, NULL)) < 0)
 				return ret;
-			ZERO_OUT(&signalinfo, sizeof(struct siginfo));
+			ZERO_OUT(&signalinfo, sizeof(siginfo_t));
 			WAIT_FOR_SIGNALS(&signalinfo, SIGNUM_MQUEUE_RECEIVE);
 			if (SIG_VAL < 0) {
 				return PTERM_LOOP_FAIL;
@@ -180,8 +171,13 @@ int handle_pty_io(pid_t procid, int masterfd, char *swap) {
 				DATA_COPY(swapptr, MSG_DELIVER_ERR_MSG_TXT, MSG_DELIVER_ERR_MSG_LEN);
 			}
 			*swapptr = (char)FLAG_SEND_OUT;
-			if ((ret = mq_receive(mqdesc, &swapptr[1], SWAP_AREA_LEN, NULL)))
-				return ret;
+			shliolen = 1;
+			while (shliolen >= 0 && IS_NOT_FLAG(swap, FLAG_TERM_MSG)) {
+				shliolen = mq_receive(mqdesc, &swapptr[shliolen], SHELL_IO_LEN, NULL);
+			}
+			if (shliolen < 0) {
+				return shliolen;
+			}
 		} 
 	}
 	SEND_SIGNAL_TO_CHILD(procid, SIGNUM_TERMINATE_MASTER, int, masterfd);
