@@ -45,6 +45,18 @@
 #define SHELL_DFL "/usr/bin/bash"
 #endif
 
+#ifndef MQ_FILE_FMT
+#define MQ_FILE_FMT "%d.btymq"
+#endif
+
+#ifndef ZERO_OUT
+#define ZERO_OUT(BUFF, LEN) memset(BUFF, 0, LEN)
+#endif
+
+#ifndef DATA_COPY
+#define DATA_COPY(DST_BUFF, SRC_BUFF, LEN) memmove(DST_BUFF, SRC_BUFF, LEN)
+#endif
+
 #if  !defined(MSG_DELIVER_ERR_MSG_TXT) && !defined(MSG_DELIVER_ERR_MSG_LEN)
 #define MSG_DELIVER_ERR_MSG_TXT "Failed to relay command to shell process"
 #define MSG_DELIVER_ERR_MSG_LEN 45
@@ -59,12 +71,9 @@
 #define __SIZEOF_LONG_LONG__ sizeof(unsigned long long)
 #endif
 
-
 #define STDIN_FD fileno(stdin)
 #define STDOUT_FD fileno(stdout)
 #define STDERR_FD fileno(stderr)
-
-#define RETCTX_NUM 5
 
 #define FLAG_NEW_CMD 255
 #define FLAG_SEND_OUT 128
@@ -75,11 +84,15 @@
 #define TERM_CREATE_SUCCESS 1
 #define MQUEUE_FNAME_SUCCESS 1
 #define SHELL_DEFAULTED 123
+#define PIPE_OPEN_SUCCESS 132
 
 #define MQNAME_FAIL_RET -1
 #define PTERM_LOOP_FAIL -1
 #define TERM_FINISHED 1
-#define RETCTX_SUCCESS 1
+#define RETCTX_PIPE_ERR 2
+#define RETCTX_SUCCESS 7
+#define RETCTX_ERR 6
+#define RETCTX_NUM 5
 
 #define SIGNUM_SHELL_EXEC SIGRTMIN
 #define SIGNUM_PIPE_OPEN SIGRTMIN + 1
@@ -91,12 +104,19 @@
 #define SIGNUM_MQUEUE_NAME SIGRTMIN + 7
 #define SIGNUM_TERMINATE_MASTER SIGRTMIN + 8
 #define SIGNUM_MQUEUE_RECEIVE SIGRTMIN + 9
+#define SIGNUM_PIPE_OPEN SIGRTMIN + 10
 
-#define SANITIZE_SIG_RETURN(SIGVAL) ((SIGVAL.si_signo  << 64) | (-1 * SIGVAL.si_value.si_int) )
-#define RETURN_PROCID_SUCCESS(PROCID) (133421d | (PROCID << 32))
+#define SIG_VAL signalinfo.si_value.int_val
+#define SIG_NUM signalinfo.si_no
+
+#define SANITIZE_PIPE_ERR_RETURN(PIPE_ERR) ((-1 * PIPE_ERR) << 2) | RETCTX_PIPE_ERR
+#define SANITIZE_SIG_ERR_RETURN(SIGVAL) ((SIGVAL.si_signo  << 6) | ((-1 * SIGVAL.si_value.si_int)) << 3) | RETCTX_ERR
 
 #define IS_FLAG(BUFF, FLAG) (unsigned char)BUFF[0] == FLAG
 #define IS_NOT_FLAG(BUFF, FLAG) (unsigned char)BUFF[0] != FLAG
+
+
+#define GET_MQ_NAME(BUF, PID) snprintf(BUF, MQUEUE_NAME_LEN, MQ_FILE_FMT, PID)
 
 #define WAIT_FOR_SIGNALS(INFO, NSECS, ...)                                             \
   do {                                                                         \
