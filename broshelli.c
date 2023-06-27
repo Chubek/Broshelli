@@ -152,8 +152,8 @@ int create_new_terminal(unsigned long retctx[RETCTX_NUM]) {
 	}
 }
 
-int kill_terminal_by_force(pid_t shellpid) {
-	return kill(shellpid, SIGKILL);
+int kill_terminal_by_force(pid_t cpid, pid_t shellpid) {
+	return kill(cpid, SIGKILL) & kill(shellpid, SIGKILL);
 }
 
 int handle_pty_io(pid_t procid, int masterfd, char *swap) {
