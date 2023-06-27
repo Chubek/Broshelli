@@ -77,6 +77,7 @@
 
 #define FLAG_NEW_CMD 255
 #define FLAG_SEND_OUT 128
+#define FLAG_TERM_MSG 135
 #define FLAG_TERM_PTY 221
 #define FLAG_TERM_MASTER 255
 
@@ -104,29 +105,27 @@
 #define SIGNUM_MQUEUE_NAME SIGRTMIN + 7
 #define SIGNUM_TERMINATE_MASTER SIGRTMIN + 8
 #define SIGNUM_MQUEUE_RECEIVE SIGRTMIN + 9
-#define SIGNUM_PIPE_OPEN SIGRTMIN + 10
 
-#define SIG_VAL signalinfo.si_value.int_val
+#define SIG_VAL signalinfo.si_value.sival_int
 #define SIG_NUM signalinfo.si_no
 
 #define SANITIZE_PIPE_ERR_RETURN(PIPE_ERR) ((-1 * PIPE_ERR) << 2) | RETCTX_PIPE_ERR
 #define SANITIZE_SIG_ERR_RETURN(SIGVAL) ((SIGVAL.si_signo  << 6) | ((-1 * SIGVAL.si_value.si_int)) << 3) | RETCTX_ERR
 
-#define IS_FLAG(BUFF, FLAG) (unsigned char)BUFF[0] == FLAG
-#define IS_NOT_FLAG(BUFF, FLAG) (unsigned char)BUFF[0] != FLAG
-
+#define IS_FLAG(BUFF, FLAG) ((unsigned char)BUFF[0] == FLAG)
+#define IS_NOT_FLAG(BUFF, FLAG) ((unsigned char)BUFF[0] != FLAG)
 
 #define GET_MQ_NAME(BUF, PID) snprintf(BUF, MQUEUE_NAME_LEN, MQ_FILE_FMT, PID)
 
 #define WAIT_FOR_SIGNALS(INFO, NSECS, ...)                                             \
   do {                                                                         \
-    char signal, signals[] = {__VA_ARGS__, 0};                                 \
-    struct sigset_t signalset;                                                 \
-    struct tspec =  (struct timespec){.tv_sec = 0, .tv_nsec = NSECS}		   \
+    int signal, signals[] = {__VA_ARGS__, 0}, *siptr = &signals[0];                                 \
+    sigset_t signalset;                                                 \
+    struct timespec time =  (struct timespec){.tv_sec = 0, .tv_nsec = NSECS};		   \
     sigfillset(&signalset);                                                    \
-    while ((signal = *signals++))                                              \
-      sigaddset(&signalset, (int)signal);                                      \
-    sigtimedwait(&signalset, INFO, &tspec);                                    \
+    while ((signal = *siptr++))                                              \
+      sigaddset(&signalset, signal);                                      \
+    sigtimedwait(&signalset, INFO, &time);                                    \
   } while (0)
 
 #define SEND_SIGNAL(PROCNUM, SIGNUM, SVALTYY, SIGVAL)                          \
@@ -148,18 +147,27 @@
   } while (0)
 
 #define TRACE_CURR_PROCESS() ptrace(PTRACE_TRACEME, NULL, NULL, NULL)
-#define UNTRACE_CHILD_PROCESS(PID) ptrace(PTRAC_DETACH, PID, NULL, NULL)
+#define UNTRACE_CHILD_PROCESS(PID) ptrace(PTRACE_DETACH, PID, NULL, NULL)
 
+#define PIPE_READ(PIPE, ...) do { close(PIPE[1]); read(PIPE[0], __VA_ARGS__);  close(PIPE[0]); } while (0)
+#define PIPE_WRITE(PIPE, ...) do { close(PIPE[0]); write(PIPE[1], __VA_ARGS__);  close(PIPE[1]); } while (0)
+
+#define READ_AND_CLOSE(FD, ...) do { read(FD, __VA_ARGS__); close(FD); } while (0)
+#define WRITE_AND_CLOSE(FD, ...) do { write(FD, __VA_ARGS__); close(FD); } while (0)
 
 #define ASSIGN_RETCTX(RETCTX, ...) \
-  &RETCTX[0] = {__VA_ARGS__}
+  do {
+  	unsigned int ctx, ctxs[RTECTX_NUM] = { __VA_ARGS__, 0 }, *ctxptr = &ctxs[0], *ctxhead = ctxptr;
+  	while (ctx = *ctxptr++)
+  		RETCTX[ctxptr - ctxhead] = ctx;
+  } while (0)
 
-typedef struct {
+typedef struct SlavePty {
 	char filename[SLVFNAME_LEN_MAX];
 	size_t fnlen;
 } slvfn_t;
 
-typedef struct {
+typedef struct PtyPair {
   int masterfd;
   int slavefd;
   slvfn_t slavefn;
