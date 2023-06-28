@@ -11,3 +11,5 @@ Just take a look, don't compile it. Because it WON'T. I am currently fixing a lo
 Please tell me the mistakes I have made so far. I will post this on the fora and also I am reachable on Discord under `.chubak`.
 
 Thanks
+
+UPDATE: `clang-tidy` says no errors?
