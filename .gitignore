@@ -4,3 +4,4 @@ swap*
 c
 wasi-libc
 compile.sh
+*.wasm

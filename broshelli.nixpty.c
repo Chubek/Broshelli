@@ -194,3 +194,4 @@ int handle_pty_io(pid_t procid, int masterfd, char *swap) {
   SEND_SIGNAL(procid, SIGNUM_TERMINATE_MASTER, int, masterfd);
   return TERM_FINISHED;
 }
+
