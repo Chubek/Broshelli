@@ -1,27 +1,6 @@
 #ifndef IODEF_H
 #define IODEF_H
 
-
-#ifndef PTY_NAME_LEN_MAX
-#define PTY_NAME_LEN_MAX 64
-#endif
-
-#ifndef SHELL_PATH_LEN
-#define SHELL_PATH_LEN 256
-#endif
-
-#ifndef MQUEUE_NAME_LEN
-#define MQUEUE_NAME_LEN 512
-#endif
-
-#ifndef SHELL_IO_LEN
-#define SHELL_IO_LEN 256000
-#endif
-
-#ifndef MQ_FILE_FMT
-#define MQ_FILE_FMT "%d.btymq"
-#endif
-
 #define STDIN_FD fileno(stdin)
 #define STDOUT_FD fileno(stdout)
 #define STDERR_FD fileno(stderr)
