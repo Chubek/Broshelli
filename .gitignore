@@ -2,3 +2,5 @@ a.out
 swap*
 *.o
 c
+wasi-libc
+compile.sh
