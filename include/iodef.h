@@ -2,8 +2,8 @@
 #define IODEF_H
 
 
-#ifndef SLVFNAME_LEN_MAX
-#define SLVFNAME_LEN_MAX 64
+#ifndef PTY_NAME_LEN_MAX
+#define PTY_NAME_LEN_MAX 64
 #endif
 
 #ifndef SHELL_PATH_LEN
