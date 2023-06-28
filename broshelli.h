@@ -11,11 +11,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <time.h>
-#include <sys/types.h>
 #include <sys/ptrace.h>
- #include <sys/stat.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 
 #ifndef SLVFNAME_LEN_MAX
 #define SLVFNAME_LEN_MAX 64
@@ -57,7 +57,7 @@
 #define DATA_COPY(DST_BUFF, SRC_BUFF, LEN) memmove(DST_BUFF, SRC_BUFF, LEN)
 #endif
 
-#if  !defined(MSG_DELIVER_ERR_MSG_TXT) && !defined(MSG_DELIVER_ERR_MSG_LEN)
+#if !defined(MSG_DELIVER_ERR_MSG_TXT) && !defined(MSG_DELIVER_ERR_MSG_LEN)
 #define MSG_DELIVER_ERR_MSG_TXT "Failed to relay command to shell process"
 #define MSG_DELIVER_ERR_MSG_LEN 45
 #endif
@@ -65,7 +65,6 @@
 #ifndef SWAP_AREA_LEN
 #define SWAP_AREA_LEN 64000
 #endif
-
 
 #ifndef __SIZEOF_LONG_LONG__
 #define __SIZEOF_LONG_LONG__ sizeof(unsigned long long)
@@ -81,9 +80,11 @@
 #define FLAG_TERM_PTY 221
 #define FLAG_TERM_MASTER 255
 
+#define OPENPTY_SUCCESS 1
 #define MESSAGE_RECEIVE_SUCCESS 1
 #define TERM_CREATE_SUCCESS 1
 #define MQUEUE_FNAME_SUCCESS 1
+#define CREATE_DEFAULTED 2
 #define SHELL_DEFAULTED 123
 #define PIPE_OPEN_SUCCESS 132
 
@@ -107,73 +108,89 @@
 #define SIGNUM_MQUEUE_RECEIVE SIGRTMIN + 9
 
 #define SIG_VAL signalinfo.si_value.sival_int
-#define SIG_NUM signalinfo.si_no
+#define SIG_NUM signalinfo.si_signo
 
-#define SANITIZE_PIPE_ERR_RETURN(PIPE_ERR) ((-1 * PIPE_ERR) << 2) | RETCTX_PIPE_ERR
-#define SANITIZE_SIG_ERR_RETURN(SIGVAL) ((SIGVAL.si_signo  << 6) | ((-1 * SIGVAL.si_value.si_int)) << 3) | RETCTX_ERR
+#define SANITIZE_PIPE_ERR_RETURN(PIPE_ERR)                                     \
+  ((-1 * PIPE_ERR) << 2) | RETCTX_PIPE_ERR
+#define SANITIZE_SIG_ERR_RETURN(SIGVAL)                                        \
+  ((SIGVAL.si_signo << 6) | ((-1 * SIGVAL.si_value.sival_int)) << 3) |         \
+      RETCTX_ERR
 
 #define IS_FLAG(BUFF, FLAG) ((unsigned char)BUFF[0] == FLAG)
 #define IS_NOT_FLAG(BUFF, FLAG) ((unsigned char)BUFF[0] != FLAG)
 
 #define GET_MQ_NAME(BUF, PID) snprintf(BUF, MQUEUE_NAME_LEN, MQ_FILE_FMT, PID)
 
-#define WAIT_FOR_SIGNALS(INFO, NSECS, ...)                                             \
+#define WAIT_FOR_SIGNALS(INFO, NSECS, ...)                                     \
   do {                                                                         \
-    int signal, signals[] = {__VA_ARGS__, 0}, *siptr = &signals[0];                                 \
-    sigset_t signalset;                                                 \
-    struct timespec time =  (struct timespec){.tv_sec = 0, .tv_nsec = NSECS};		   \
-    sigfillset(&signalset);                                                    \
-    while ((signal = *siptr++))                                              \
-      sigaddset(&signalset, signal);                                      \
-    sigtimedwait(&signalset, INFO, &time);                                    \
+    int signal, signals[] = {__VA_ARGS__, 0}, *siptr = &signals[0];            \
+    sigset_t signalset;                                                        \
+    struct timespec time = (struct timespec){.tv_sec = 0, .tv_nsec = NSECS};   \
+    sigemptyset(&signalset);                                                   \
+    while ((signal = *siptr++))                                                \
+      sigaddset(&signalset, signal);                                           \
+    sigtimedwait(&signalset, INFO, &time);                                     \
   } while (0)
 
 #define SEND_SIGNAL(PROCNUM, SIGNUM, SVALTYY, SIGVAL)                          \
   sigqueue(PROCNUM, SIGNUM, (union sigval){.sival_##SVALTYY = SIGVAL})
 #define SEND_SIGNAL_TO_PARENT(...) SEND_SIGNAL(getppid(), __VA_ARGS__)
 #define RAISE_SIGNAL_TO_SELF(...) SEND_SIGNAL(getpid(), __VA_ARGS__)
-#define RELAY_SIGNUM_TO_PARENT(SIGNUM, RELAY_SIGNUM) 							\
-  do {																			\
-  	void signal_handler(int signum) {											\
-  		SEND_SIGNAL_TO_PARENT(signum, int, RELAY_SIGNUM);						\
-  	}																			\
-	struct sigaction signalaction =  (struct sigaction){.sa_handler = &signal_handler};	\
-	sigaction(SIGNUM, &signalaction, NULL);												 \
+#define RELAY_SIGNUM_TO_PARENT(SIGNUM, SIGNAL_HANDLER)                         \
+  do {                                                                         \
+    const struct sigaction signalaction =                                      \
+        (struct sigaction){.sa_handler = &SIGNAL_HANDLER};                     \
+    sigaction(SIGNUM, &signalaction, NULL);                                    \
   } while (0)
-#define SET_RT_SIGNAL_ACTION(SIGNUM, SA_HANDLER_NAME)							\
-  do {																					\
-  	struct sigaction signalaction = (struct sigaction){.sa_handler = &SA_HANDLER_NAME, .sa_flags = SA_SIGINFO};	\
-  	sigaction(SIGNUM, &signalaction, NULL);												\
+#define SET_RT_SIGNAL_ACTION(SIGNUM, SA_HANDLER_NAME)                          \
+  do {                                                                         \
+    struct sigaction signalaction = (struct sigaction){                        \
+        .sa_handler = &SA_HANDLER_NAME, .sa_flags = SA_SIGINFO};               \
+    sigaction(SIGNUM, &signalaction, NULL);                                    \
   } while (0)
 
 #define TRACE_CURR_PROCESS() ptrace(PTRACE_TRACEME, NULL, NULL, NULL)
 #define UNTRACE_CHILD_PROCESS(PID) ptrace(PTRACE_DETACH, PID, NULL, NULL)
 
-#define PIPE_READ(PIPE, ...) do { close(PIPE[1]); read(PIPE[0], __VA_ARGS__);  close(PIPE[0]); } while (0)
-#define PIPE_WRITE(PIPE, ...) do { close(PIPE[0]); write(PIPE[1], __VA_ARGS__);  close(PIPE[1]); } while (0)
-
-#define READ_AND_CLOSE(FD, ...) do { read(FD, __VA_ARGS__); close(FD); } while (0)
-#define WRITE_AND_CLOSE(FD, ...) do { write(FD, __VA_ARGS__); close(FD); } while (0)
-
-#define ASSIGN_RETCTX(RETCTX, ...) \
-  do {
-  	unsigned int ctx, ctxs[RTECTX_NUM] = { __VA_ARGS__, 0 }, *ctxptr = &ctxs[0], *ctxhead = ctxptr;
-  	while (ctx = *ctxptr++)
-  		RETCTX[ctxptr - ctxhead] = ctx;
+#define PIPE_READ(PIPE, ...)                                                   \
+  do {                                                                         \
+    close(PIPE[1]);                                                            \
+    read(PIPE[0], __VA_ARGS__);                                                \
+    close(PIPE[0]);                                                            \
+  } while (0)
+#define PIPE_WRITE(PIPE, ...)                                                  \
+  do {                                                                         \
+    close(PIPE[0]);                                                            \
+    write(PIPE[1], __VA_ARGS__);                                               \
+    close(PIPE[1]);                                                            \
   } while (0)
 
-typedef struct SlavePty {
-	char filename[SLVFNAME_LEN_MAX];
-	size_t fnlen;
-} slvfn_t;
+#define READ_AND_CLOSE(FD, ...)                                                \
+  do {                                                                         \
+    read(FD, __VA_ARGS__);                                                     \
+    close(FD);                                                                 \
+  } while (0)
+#define WRITE_AND_CLOSE(FD, ...)                                               \
+  do {                                                                         \
+    write(FD, __VA_ARGS__);                                                    \
+    close(FD);                                                                 \
+  } while (0)
+
+#define ASSIGN_RETCTX(RETCTX, ...)                                             \
+  do {                                                                         \
+    unsigned long ctx, ctxs[RETCTX_NUM + 1] = {__VA_ARGS__, 0},                \
+                                         *ctxptr = &ctxs[0],                   \
+                                         *ctxhead = ctxptr;                    \
+    while ((ctx = *ctxptr++))                                                  \
+      RETCTX[ctxptr - ctxhead] = ctx;                                          \
+  } while (0)
 
 typedef struct PtyPair {
   int masterfd;
   int slavefd;
-  slvfn_t slavefn;
+  char slavefn[SLVFNAME_LEN_MAX];
   pid_t slavepid;
   FILE *masterfstm;
 } ptypair_t;
-
 
 #endif
