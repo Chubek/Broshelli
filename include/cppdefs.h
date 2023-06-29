@@ -73,19 +73,20 @@
 
 
 #ifdef CONPTY
-#ifndef __windows__
-#warning "CONTPY defined, however, host does not seem to be Windows, proceed with caution"
-#elif defined(__unix__) && !defined(FORCE_HOST)
+#if !defined(__windows__) && !defined(FORCE_HOST)
 #error "CONPTY is only available on Windows hosts, compile with FORCE_HOST to ignore this error"
+#elif !defined(__windows__) && defined(FORCE_HOST)
+#define __windows__
 #endif
 #elif NIXPTY
 #if !defined(__unix__) && !defined(FORCE_HOST)
 #error "NIXPTY is only available on POSIX hosts, compile with FORCE_HOST to ignore this error"
+#elif !defined(__unix__) && defined(FORCE_HOST)
+#define __unix__
 #endif
-#elif BROPTY
-#warning "WASM support is experimental"
+#elif defined(BROPTY) && !defined(__wasm__)
+#define __wasm__
 #endif
-
 
 
 
