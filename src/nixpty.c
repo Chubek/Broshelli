@@ -3,7 +3,7 @@
 #include "valdef.h"
 #include "iodef.h"
 
-yield_t nixio_substitue_stdio(ptydsc_t subfdsc) {
+yield_t nixpty_substitue_stdio(ptydsc_t subfdsc) {
 	yield_t yieldval;
 	ptydsc_t fdscstdin = dup(subfdsc);
 	ptydsc_t fdscstdout = dup(subfdsc);
@@ -17,7 +17,7 @@ yield_t nixio_substitue_stdio(ptydsc_t subfdsc) {
 	return FDSCDUP_SUCCESS_STDIO;
 }
 
-yield_t nixio_open_posix_pty_master(ptyfile_t *pty) {
+yield_t nixpty_open_posix_pty_master(ptyfile_t *pty) {
 	yield_t yieldval;
 	if (IS_YIELD_FAIL(yieldval = pty->fdsc = posix_open(O_RDWR | O_NOCTTY)))
 		return MASK_YIELD_FAILURE(yieldval, POSIXMASTERPTY_FAILURE_OPEN, POSIXMASTERPTY_MASK_SHFL);
@@ -29,7 +29,7 @@ yield_t nixio_open_posix_pty_master(ptyfile_t *pty) {
 	return POSIXMASTERPTY_SUCCESS_OPEN;
 }
 
-yield_t nixio_open_posix_pty_slave(ptydsc_t masterdsc, ptyfile_t *pty) {
+yield_t nixpty_open_posix_pty_slave(ptydsc_t masterdsc, ptyfile_t *pty) {
 	yield_t yeidlval;
 	if (IS_YIELD_FAIL(yieldval = ptsname_r(masterdsc, &pty->fname[0], PTY_NAME_LEN_MAX)))
 		return MASK_YIELD_FAILURE(yieldval, POSIXSLAVEPTY_FAILURE_PTSNAME, POSIXSLAVEPTY_MASK_SHLF);
