@@ -1,10 +1,6 @@
 #ifndef VALDEF_H
 #define VALDEF_H
 
-#ifndef __SIZEOF_LONG_LONG__
-#define __SIZEOF_LONG_LONG__ sizeof(unsigned long long)
-#endif
-
 #ifndef SHELL_ENV
 #define SHELL_ENV "SHELL"
 #endif
@@ -69,6 +65,6 @@
       RETCTX[ctxptr - ctxhead] = ctx;                                          \
   } while (0)
 
-
+typedef long yield_t;
 
 #endif
