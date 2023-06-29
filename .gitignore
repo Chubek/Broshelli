@@ -5,3 +5,4 @@ c
 wasi-libc
 compile.sh
 *.wasm
+__*
