@@ -1,6 +1,8 @@
 #ifndef IODEF_H
 #define IODEF_H
 
+typedef struct dirent *dirmeta_t;
+
 #define STDIN_FD fileno(stdin)
 #define STDOUT_FD fileno(stdout)
 #define STDERR_FD fileno(stderr)
@@ -31,5 +33,6 @@
     write(FD, __VA_ARGS__);                                                    \
     close(FD);                                                                 \
   } while (0)
+
 
 #endif
