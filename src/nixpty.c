@@ -1,7 +1,7 @@
 #include "cppdefs.h"
-#include "ptydef.h"
-#include "valdef.h"
-#include "iodef.h"
+#include "ptydefs.h"
+#include "retdefs.h"
+#include "iodefs.h"
 
 yield_t nixpty_substitue_stdio(ptydsc_t subfdsc) {
 	yield_t yieldval;
