@@ -39,3 +39,22 @@ yield_t nixpty_open_posix_pty_slave(ptydsc_t masterdsc, ptyfile_t *pty) {
 	return POSIXSLAVEPTY_SUCCESS_OPEN;
 }
 
+yield_t nixpty_close_posix_pty_pair(ptypair_t *ppair) {
+	return close(ppair->masterpty.fdsc) & close(ppair->slavepty.fdsc);
+}
+
+ptyiolen_t nixpty_read_from_master(ptypair_t *ppair, ptyiobuf_t iobuf) {
+	ptyiolen_t readlen = 0;
+	while ((readlen = read(ppair->masterpty.fdsc, &iobuf[readlen], MAX_PTY_IO_LEN)) == MAX_PTY_IO_LEN);
+	if (readlen < 0)
+		return readlen;
+	return POSIXPTY_MASTER_READ_SUCCESS;
+}
+
+ptyiolen_t nixpty_write_to_master(ptypair_t *ppair, ptyiobuf_t iobuf) {
+	ptyiolen_t writelen = 0;
+	while ((writelen = write(ppair->masterpty.fdsc, &iobuf[writelen], MAX_PTY_IO_LEN)) == MAX_PTY_IO_LEN);
+	if (writelen < 0)
+		return writelen;
+	return POSIXPTY_MASTER_WRITE_SUCCESS;
+}
