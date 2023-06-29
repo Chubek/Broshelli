@@ -1,5 +1,5 @@
-#ifndef IODEF_H
-#define IODEF_H
+#ifndef IODEFS_H
+#define IODEFS_H
 
 typedef struct dirent *dirmeta_t;
 

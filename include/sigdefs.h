@@ -1,9 +1,5 @@
-#ifndef SIGDEF_H
-#define SIGDEF_H
-
-#ifndef MAX_SIGRT_WAITNS
-#define MAX_SIGRT_WAITNS 5000
-#endif
+#ifndef SIGDEFS_H
+#define SIGDEFS_H
 
 #define SIGNUM_SHELL_EXEC SIGRTMIN
 #define SIGNUM_PIPE_OPEN SIGRTMIN + 1

@@ -1,5 +1,5 @@
-#ifndef PTYDEF_H
-#define PTYDEF_H
+#ifndef PTYDEFS_H
+#define PTYDEFS_H
 
 #define _XOPEN_SOURCE  600
 #define _GNU_SOURCE
