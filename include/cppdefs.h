@@ -9,8 +9,16 @@
 #define SHELL_DFL "/usr/bin/bash"
 #endif
 
+#ifndef MAX_PTY_IO_LEN
+#define MAX_PTY_IO_LEN 1024
+#endif
+
 #ifndef PTY_NAME_LEN_MAX
 #define PTY_NAME_LEN_MAX 64
+#endif
+
+#ifndef IDT_NAME_LEN_MAX
+#define IDT_NAME_LEN_MAX 32
 #endif
 
 #ifndef SHELL_PATH_LEN
@@ -46,6 +54,12 @@
 #define SWAP_AREA_LEN 64000
 #endif
 
+#if !defined(FIFO_TMP_ROOT_PATH) && defined(P_tmpdir)
+#define FIFO_TMP_ROOT_PATH P_tmpdir
+#else
+#warning "P_tmpdir is not defined by default, chooding /tmp as the defaul FIFO path"
+#define FIFO_TMP_ROOT_PATH "/tmp"
+#endif
 
 #ifndef __SIZEOF_LONG_LONG__
 #define __SIZEOF_LONG_LONG__ sizeof(unsigned long long)
@@ -69,23 +83,6 @@
 
 #ifndef MAX_SIGRT_WAITNS
 #define MAX_SIGRT_WAITNS 5000
-#endif
-
-
-#ifdef CONPTY
-#if !defined(__windows__) && !defined(FORCE_HOST)
-#error "CONPTY is only available on Windows hosts, compile with FORCE_HOST to ignore this error"
-#elif !defined(__windows__) && defined(FORCE_HOST)
-#define __windows__
-#endif
-#elif NIXPTY
-#if !defined(__unix__) && !defined(FORCE_HOST)
-#error "NIXPTY is only available on POSIX hosts, compile with FORCE_HOST to ignore this error"
-#elif !defined(__unix__) && defined(FORCE_HOST)
-#define __unix__
-#endif
-#elif defined(BROPTY) && !defined(__wasm__)
-#define __wasm__
 #endif
 
 
