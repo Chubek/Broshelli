@@ -1,8 +1,5 @@
-#ifndef DYNDEF_H
-#define DYNDEF_H
-
-#ifndef VALDEF_H
-#define VALDEF_H
+#ifndef CPPDEFS_H
+#define CPPDEFS_H
 
 #ifndef SHELL_ENV
 #define SHELL_ENV "SHELL"
@@ -31,7 +28,6 @@
 #ifndef MQ_FILE_FMT
 #define MQ_FILE_FMT "%d.btymq"
 #endif
-
 
 #ifndef ZERO_OUT
 #define ZERO_OUT(BUFF, LEN) memset(BUFF, 0, LEN)
@@ -70,6 +66,26 @@
 #ifndef LEN_BSDPTY_PATT
 #define LEN_BSDPTY_PATT 3
 #endif
+
+#ifndef MAX_SIGRT_WAITNS
+#define MAX_SIGRT_WAITNS 5000
+#endif
+
+
+#ifdef CONPTY
+#ifndef __windows__
+#warning "CONTPY defined, however, host does not seem to be Windows, proceed with caution"
+#elif defined(__unix__) && !defined(FORCE_HOST)
+#error "CONPTY is only available on Windows hosts, compile with FORCE_HOST to ignore this error"
+#endif
+#elif NIXPTY
+#if !defined(__unix__) && !defined(FORCE_HOST)
+#error "NIXPTY is only available on POSIX hosts, compile with FORCE_HOST to ignore this error"
+#endif
+#elif BROPTY
+#warning "WASM support is experimental"
+#endif
+
 
 
 
