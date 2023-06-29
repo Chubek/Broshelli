@@ -1,6 +1,16 @@
 #ifndef DYNDEF_H
 #define DYNDEF_H
 
+#ifndef VALDEF_H
+#define VALDEF_H
+
+#ifndef SHELL_ENV
+#define SHELL_ENV "SHELL"
+#endif
+
+#ifndef SHELL_DFL
+#define SHELL_DFL "/usr/bin/bash"
+#endif
 
 #ifndef PTY_NAME_LEN_MAX
 #define PTY_NAME_LEN_MAX 64
@@ -60,6 +70,7 @@
 #ifndef LEN_BSDPTY_PATT
 #define LEN_BSDPTY_PATT 3
 #endif
+
 
 
 #endif

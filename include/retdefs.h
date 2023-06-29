@@ -1,14 +1,3 @@
-#ifndef VALDEF_H
-#define VALDEF_H
-
-#ifndef SHELL_ENV
-#define SHELL_ENV "SHELL"
-#endif
-
-#ifndef SHELL_DFL
-#define SHELL_DFL "/usr/bin/bash"
-#endif
-
 #define FDSCDUP_SUCCESS_STDIO 15
 #define FDSCDUP_FAIL_STDIN 1
 #define FDSCDUP_FAIL_STDOUT 3
